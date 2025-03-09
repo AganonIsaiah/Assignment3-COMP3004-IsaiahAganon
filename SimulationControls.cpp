@@ -131,7 +131,7 @@ void SimulationControls::runSimulation() {
     // Process initialized passenger actions first
     QList<PassengerAction> actionList = passengerBehaviourSetup->getActionList();
     if (actionList.isEmpty()) {
-        logConsole->logMessage("No actions in the action list.");
+        logConsole->logMessage("No actions in Passenger Behaviour Setup.");
     } else {
         for (const auto &action : actionList) {
             if (completedPassengers >= passengerCount) break;
@@ -157,7 +157,7 @@ void SimulationControls::runSimulation() {
 
         // Minor text output delays
         QApplication::processEvents();
-        QThread::msleep(500);
+        QThread::msleep(20);
 
         if (isPaused || !timer->isActive()) {
             logConsole->logMessage("Simulation interrupted.");
@@ -185,17 +185,20 @@ void SimulationControls::executePassengerAction(const PassengerAction &action, i
                            .arg(elevatorState == Idle ? "Idle" :
                                 elevatorState == Moving ? "Moving" : "Stopped"));
 
+    // Handle different action types
     if (action.actionType == "RequestCar") {
+        // Passenger requests elevator at their floor
         logConsole->logMessage(QString("> Passenger requested car at floor %1.").arg(action.floor));
 
         // Update elevator state to Moving
         elevatorState = Moving;
         logConsole->logMessage(QString("Elevator is at floor %1, state: %2.")
-                               .arg(elevatorCurrentFloor)
-                               .arg("Moving"));
+                              .arg(elevatorCurrentFloor)
+                              .arg("Moving"));
 
         // Simulate elevator moving to the requested floor
         int destinationFloor = action.floor;
+
         if (destinationFloor > elevatorCurrentFloor) {
             logConsole->logMessage("----------------");
             for (int floor = elevatorCurrentFloor + 1; floor <= destinationFloor; ++floor) {
@@ -215,79 +218,78 @@ void SimulationControls::executePassengerAction(const PassengerAction &action, i
         // Update elevator state to Stopped
         elevatorState = Stopped;
         logConsole->logMessage(QString("Elevator is at floor %1, state: %2.")
-                               .arg(elevatorCurrentFloor)
-                               .arg("Stopped"));
+                              .arg(elevatorCurrentFloor)
+                              .arg("Stopped"));
 
         // Passenger enters the elevator
         logConsole->logMessage("> Passenger has entered the elevator.");
         QThread::msleep(200);
 
-        // Simulate elevator moving to a random exit floor
-        int exitFloor = (std::rand() % buildingSetup->getFloorCount()) + 1;
+        // Note: Don't automatically move to exit floor - wait for ExitCar action
 
-        // Update elevator state to Moving
-        elevatorState = Moving;
-        logConsole->logMessage(QString("Elevator is at floor %1, state: %2.")
-                               .arg(elevatorCurrentFloor)
-                               .arg("Moving"));
+    } else if (action.actionType == "ExitCar") {
+        // Handle passenger exiting at a specific floor
+        int exitFloor = action.floor;
 
-        // Handles elevator movement from top to bottom or bottom to top
-        if (exitFloor > elevatorCurrentFloor) {
-            logConsole->logMessage("----------------");
-            for (int floor = elevatorCurrentFloor + 1; floor <= exitFloor; ++floor) {
-                logConsole->logMessage(QString("Elevator moving to floor %1...").arg(floor));
-                QThread::msleep(200); // Simulate time between floors
+        // Update elevator state to Moving (if not already at exit floor)
+        if (elevatorCurrentFloor != exitFloor) {
+            elevatorState = Moving;
+            logConsole->logMessage(QString("Elevator is at floor %1, state: %2.")
+                                  .arg(elevatorCurrentFloor)
+                                  .arg("Moving"));
+
+            // Simulate elevator moving to exit floor
+            if (exitFloor > elevatorCurrentFloor) {
+                logConsole->logMessage("----------------");
+                for (int floor = elevatorCurrentFloor + 1; floor <= exitFloor; ++floor) {
+                    logConsole->logMessage(QString("Elevator moving to floor %1...").arg(floor));
+                    QThread::msleep(200);
+                }
+            } else if (exitFloor < elevatorCurrentFloor) {
+                logConsole->logMessage("----------------");
+                for (int floor = elevatorCurrentFloor - 1; floor >= exitFloor; --floor) {
+                    logConsole->logMessage(QString("Elevator moving to floor %1...").arg(floor));
+                    QThread::msleep(200);
+                }
             }
-        } else if (exitFloor < elevatorCurrentFloor) {
-            logConsole->logMessage("----------------");
-            for (int floor = elevatorCurrentFloor - 1; floor >= exitFloor; --floor) {
-                logConsole->logMessage(QString("Elevator moving to floor %1...").arg(floor));
-                QThread::msleep(200); // Simulate time between floors
-            }
+
+            elevatorCurrentFloor = exitFloor;
         }
-        elevatorCurrentFloor = exitFloor; // Update elevator's current floor
 
         // Update elevator state to Stopped
         elevatorState = Stopped;
         logConsole->logMessage(QString("Elevator is at floor %1, state: %2.")
-                               .arg(elevatorCurrentFloor)
-                               .arg("Stopped"));
+                              .arg(elevatorCurrentFloor)
+                              .arg("Stopped"));
 
         // Passenger exits the elevator
         logConsole->logMessage(QString("> Passenger exited at floor %1.").arg(exitFloor));
         completedPassengers++;
-    }
-    else if (action.actionType == "ExitCar") {
-        logConsole->logMessage(QString("> Passenger exited car at floor %1.").arg(action.floor));
-        QThread::msleep(200);
-        completedPassengers++;
-    }
-    else if (action.actionType == "OpenDoor") {
+        // Log the current progress
+        logConsole->logMessage(QString("Completed passengers: %1/%2")
+                              .arg(completedPassengers).arg(passengerCount));
+
+    } else if (action.actionType == "OpenDoor") {
         logConsole->logMessage(QString("> Door opened at floor %1.").arg(action.floor));
         QThread::msleep(200);
-    }
-    else if (action.actionType == "CloseDoor") {
+
+    } else if (action.actionType == "CloseDoor") {
         logConsole->logMessage(QString("> Door closed at floor %1.").arg(action.floor));
         QThread::msleep(200);
-    }
-    else if (action.actionType == "PushHelp") {
+
+    } else if (action.actionType == "PushHelp") {
         logConsole->logMessage(QString("> Passenger pushed help button at floor %1.").arg(action.floor));
         QThread::msleep(200);
         // Trigger the "help" safety event
         printSafetyEvent("help", completedPassengers, passengerCount);
     }
 
-    // Update elevator state to Idle if no actions are being processed
+    // Update elevator state to Idle after action is completed
     elevatorState = Idle;
     logConsole->logMessage(QString("Elevator is at floor %1, state: %2.")
-                           .arg(elevatorCurrentFloor)
-                           .arg("Idle"));
-
-    // Log the current progress
-    logConsole->logMessage(QString("Completed passengers: %1/%2")
-                           .arg(completedPassengers).arg(passengerCount));
+                          .arg(elevatorCurrentFloor)
+                          .arg("Idle"));
 }
-
 /**
  * @brief Randomizes passengers' behaviour and runs "RequestCar" by default
  * @param completedPassengers Tracks number of passengers who reached their destinations
@@ -352,6 +354,21 @@ void SimulationControls::printElevatorMovement(int &completedPassengers) {
         }
 
         // Simulate the action based on its type
+        if (action.actionType == "OpenDoor") {
+            logConsole->logMessage(QString("> Door opened at floor %1 at time step %2.")
+                                   .arg(action.floor).arg(action.timeStep));
+            processedActions.insert(i);
+        }
+        if (action.actionType == "CloseDoor") {
+            logConsole->logMessage(QString("> Door closed at floor %1 at time step %2.")
+                                   .arg(action.floor).arg(action.timeStep));
+            processedActions.insert(i);
+        }
+        if (action.actionType == "PushHelp") {
+            logConsole->logMessage(QString("> Help button pushed at floor %1 at time step %2.")
+                                   .arg(action.floor).arg(action.timeStep));
+            processedActions.insert(i);
+        }
         if (action.actionType == "RequestCar") {
             logConsole->logMessage(QString("> Passenger requested car at floor %1 at time step %2.")
                                    .arg(action.floor).arg(action.timeStep));
@@ -377,7 +394,7 @@ void SimulationControls::printElevatorMovement(int &completedPassengers) {
             logConsole->logMessage("> Passenger has entered the elevator.");
             processedActions.insert(i);
         }
-        else if (action.actionType == "ExitCar") {
+        if (action.actionType == "ExitCar") {
             logConsole->logMessage(QString("> Passenger exited car at floor %1 at time step %2.")
                                    .arg(action.floor).arg(action.timeStep));
 
@@ -391,21 +408,6 @@ void SimulationControls::printElevatorMovement(int &completedPassengers) {
             processedActions.insert(i);
             logConsole->logMessage(QString("Completed passengers: %1/%2")
                                    .arg(completedPassengers).arg(passengerCount));
-        }
-        else if (action.actionType == "OpenDoor") {
-            logConsole->logMessage(QString("> Door opened at floor %1 at time step %2.")
-                                   .arg(action.floor).arg(action.timeStep));
-            processedActions.insert(i);
-        }
-        else if (action.actionType == "CloseDoor") {
-            logConsole->logMessage(QString("> Door closed at floor %1 at time step %2.")
-                                   .arg(action.floor).arg(action.timeStep));
-            processedActions.insert(i);
-        }
-        else if (action.actionType == "PushHelp") {
-            logConsole->logMessage(QString("> Help button pushed at floor %1 at time step %2.")
-                                   .arg(action.floor).arg(action.timeStep));
-            processedActions.insert(i);
         }
     }
 
@@ -489,6 +491,7 @@ void SimulationControls:: printSafetyEvent(const std::string &event, int &comple
         logConsole->logMessage("Power Out Alarm Triggered");
         logConsole->logMessage("> Stay calm, moving the elevators to a safe floor.");
         logConsole->logMessage("> All elevators have reached a safe floor, please exit!");
+        logConsole->logMessage("All passengers have exited the elevators.");
         completedPassengers += totalPassengers - completedPassengers;
     }
 
