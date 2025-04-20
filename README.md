@@ -16,7 +16,7 @@ https://youtu.be/t4bDItAw5Bc
 
 # Folder Structure
 ## Documentation Folder
-Include:
+Includes:
 - Use Cases + Use Case Diagram
 - UML Class Diagram
 - UML Sequence Diagrams
