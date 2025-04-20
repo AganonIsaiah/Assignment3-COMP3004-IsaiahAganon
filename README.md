@@ -14,6 +14,12 @@
 ## Testing Video
 https://youtu.be/t4bDItAw5Bc
 
+## Launch Instructions
+1. cd Implementation
+2. qmake
+3. make
+4. ./Assignment3-COMP3004-IsaiahAganon
+
 # Folder Structure
 ## Documentation Folder
 Includes:
